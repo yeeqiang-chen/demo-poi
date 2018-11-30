@@ -32,7 +32,7 @@ public class ExcelHeader implements Comparable<ExcelHeader> {
     public ExcelHeader() {
     }
 
-    public ExcelHeader(int order, String methodName, String title) {
+    public ExcelHeader(int order, String title, String methodName) {
         this.order = order;
         this.title = title;
         this.methodName = methodName;

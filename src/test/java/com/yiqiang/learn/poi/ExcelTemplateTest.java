@@ -2,11 +2,16 @@ package com.yiqiang.learn.poi;
 
 import com.yiqiang.learn.poi.entity.Student;
 import com.yiqiang.learn.poi.entity.User;
-import com.yiqiang.learn.poi.util.ExcelHeader;
 import com.yiqiang.learn.poi.util.ExcelTemplate;
 import com.yiqiang.learn.poi.util.ExcelUtil;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -98,7 +103,7 @@ public class ExcelTemplateTest {
         users.add(new User(4,"aaa","水水水",11));
         users.add(new User(54,"aaa","水水水",11));
         users.add(new User(16,"aaa","水水水",11));
-        ExcelUtil.getInstance().exportObj2ExcelByTemplate(new HashMap<String,String>(),"/user.xls","e:/tmp/tus.xls", users, User.class, true);
+        ExcelUtil.getInstance().exportObj2ExcelByTemplate(new HashMap<String,String>(),"/user.xls","e:/tmp/tus.xls", users, User.class, true, true);
     }
 
     @Test
@@ -127,5 +132,37 @@ public class ExcelTemplateTest {
             User stu = (User)obj;
             System.out.println(stu);
         }
+    }
+
+    @Test
+    public void test() throws IOException {
+        Workbook workbook = WorkbookFactory.create(new File("e:/tmp/test.xlsx"));
+        Sheet sheet = workbook.getSheetAt(0);
+        List<CellRangeAddress> mergedRegions = sheet.getMergedRegions();
+        mergedRegions.stream().forEach(region -> {
+            System.out.println(region.formatAsString());
+            System.out.println("----------------------------------------------");
+            System.out.println("getFirstColumn = "+region.getFirstColumn());
+            System.out.println("getFirstRow = "+region.getFirstRow());
+            System.out.println("getLastColumn = "+region.getLastColumn());
+            System.out.println("getLastRow = "+region.getLastRow());
+            System.out.println("getNumberOfCells = "+region.getNumberOfCells());
+            System.out.println(sheet.getRow(region.getFirstRow()).getCell(region.getFirstColumn()));
+            System.out.println("----------------------------------------------");
+        });
+//        int numMergedRegions = sheet.getNumMergedRegions();
+//        System.out.println(numMergedRegions);
+        /*for (int i = 0; i < numMergedRegions; i++) {
+            System.out.println("---------------"+i+"---------------");
+            CellRangeAddress region = sheet.getMergedRegion(i);
+            System.out.println("getFirstColumn = "+region.getFirstColumn());
+            System.out.println("getFirstRow = "+region.getFirstRow());
+            System.out.println("getLastColumn = "+region.getLastColumn());
+            System.out.println("getLastRow = "+region.getLastRow());
+            System.out.println("getNumberOfCells = "+region.getNumberOfCells());
+            System.out.println(sheet.getRow(region.getFirstRow()).getCell(region.getFirstColumn()));
+            System.out.println("--------------"+i+"-------------");
+        }*/
+
     }
 }

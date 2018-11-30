@@ -2,22 +2,29 @@ package com.yiqiang.learn.poi.util;
 
 import com.yiqiang.learn.poi.annotation.ExcelResources;
 import org.apache.commons.beanutils.BeanUtils;
-import org.apache.commons.compress.archivers.dump.InvalidFormatException;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +46,7 @@ import java.util.Properties;
  */
 public class ExcelUtil {
 
+    private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ExcelUtil.class);
     private ExcelUtil() {
     }
 
@@ -69,11 +77,6 @@ public class ExcelUtil {
             }
             List<ExcelHeader> headers = getHeaderList(clz);
             Collections.sort(headers);
-            //输出标题
-            et.createNewRow();
-            for (ExcelHeader eh : headers) {
-                et.createCell(eh.getTitle());
-            }
             //输出值
             for (Object obj : objs) {
                 et.createNewRow();
@@ -81,12 +84,8 @@ public class ExcelUtil {
                     et.createCell(BeanUtils.getProperty(obj, getMethodName(eh)));
                 }
             }
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.error("ExcelUtil.handlerObj2ExcelWithTemplate.ex", e);
         }
         return et;
     }
@@ -112,10 +111,17 @@ public class ExcelUtil {
      * @param objs        对象列表
      * @param clz         对象的类型
      * @param isClasspath 模板是否在classPath路径下
+     * @param ifInsertSer 是否插入序号
      */
-    public void exportObj2ExcelByTemplate(Map<String, String> datas, String template, OutputStream os, List objs, Class clz, boolean isClasspath) {
+    public void exportObj2ExcelByTemplate(Map<String, String> datas, String template, OutputStream os,
+                                          List objs, Class clz, boolean isClasspath, boolean ifInsertSer) {
         ExcelTemplate et = handlerObj2Excel(template, objs, clz, isClasspath);
-        et.replaceFinalData(datas);
+        if (MapUtils.isNotEmpty(datas)) {
+            et.replaceFinalData(datas);
+        }
+        if (ifInsertSer) {
+            et.insertSer();
+        }
         et.wirteToStream(os);
     }
 
@@ -128,10 +134,17 @@ public class ExcelUtil {
      * @param objs        对象列表
      * @param clz         对象的类型
      * @param isClasspath 模板是否在classPath路径下
+     * @param ifInsertSer 是否插入序号
      */
-    public void exportObj2ExcelByTemplate(Map<String, String> datas, String template, String outPath, List objs, Class clz, boolean isClasspath) {
+    public void exportObj2ExcelByTemplate(Map<String, String> datas, String template, String outPath,
+                                          List objs, Class clz, boolean isClasspath, boolean ifInsertSer) {
         ExcelTemplate et = handlerObj2Excel(template, objs, clz, isClasspath);
-        et.replaceFinalData(datas);
+        if (MapUtils.isNotEmpty(datas)) {
+            et.replaceFinalData(datas);
+        }
+        if (ifInsertSer) {
+            et.insertSer();
+        }
         et.writeToFile(outPath);
     }
 
@@ -175,13 +188,32 @@ public class ExcelUtil {
             } else {
                 wb = new HSSFWorkbook();
             }
+            CellStyle cellStyle = wb.createCellStyle();
             Sheet sheet = wb.createSheet();
             Row r = sheet.createRow(0);
             List<ExcelHeader> headers = getHeaderList(clz);
             Collections.sort(headers);
+
+            // 设置样式
+            cellStyle.setAlignment(HorizontalAlignment.CENTER);
+            cellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            cellStyle.setTopBorderColor(IndexedColors.BLACK.index);
+            cellStyle.setBottomBorderColor(IndexedColors.BLACK.index);
+            cellStyle.setLeftBorderColor(IndexedColors.BLACK.index);
+            cellStyle.setRightBorderColor(IndexedColors.BLACK.index);
+            cellStyle.setBorderTop(BorderStyle.THIN);
+            cellStyle.setBorderBottom(BorderStyle.THIN);
+            cellStyle.setBorderLeft(BorderStyle.THIN);
+            cellStyle.setBorderRight(BorderStyle.THIN);
+            cellStyle.setWrapText(true);
+            Font font = wb.createFont();
+            font.setBold(true);
+            cellStyle.setFont(font);
             //写标题
             for (int i = 0; i < headers.size(); i++) {
-                r.createCell(i).setCellValue(headers.get(i).getTitle());
+                Cell cell = r.createCell(i);
+                cell.setCellStyle(cellStyle);
+                cell.setCellValue(headers.get(i).getTitle());
             }
             //写数据
             Object obj = null;
@@ -189,15 +221,13 @@ public class ExcelUtil {
                 r = sheet.createRow(i + 1);
                 obj = objs.get(i);
                 for (int j = 0; j < headers.size(); j++) {
-                    r.createCell(j).setCellValue(BeanUtils.getProperty(obj, getMethodName(headers.get(j))));
+                    Cell cell = r.createCell(j);
+                    cell.setCellStyle(cellStyle);
+                    cell.setCellValue(BeanUtils.getProperty(obj, getMethodName(headers.get(j))));
                 }
             }
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.error("ExcelUtil.handleObj2Excel.ex", e);
         }
         return wb;
     }
@@ -216,15 +246,13 @@ public class ExcelUtil {
         try {
             fos = new FileOutputStream(outPath);
             wb.write(fos);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.error("ExcelUtil.exportObj2Excel.ex", e);
         } finally {
             try {
                 if (fos != null) fos.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.error("ExcelUtil.exportObj2Excel.ex", e);
             }
         }
     }
@@ -242,7 +270,7 @@ public class ExcelUtil {
             Workbook wb = handleObj2Excel(objs, clz, isXssf);
             wb.write(os);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("ExcelUtil.exportObj2Excel.ex", e);
         }
     }
 
@@ -260,10 +288,8 @@ public class ExcelUtil {
         try {
             wb = WorkbookFactory.create(ExcelUtil.class.getResourceAsStream(path));
             return handlerExcel2Objs(wb, clz, readLine, tailLine);
-        } catch (InvalidFormatException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.error("ExcelUtil.readExcel2ObjsByClasspath.ex", e);
         }
         return null;
     }
@@ -282,10 +308,8 @@ public class ExcelUtil {
         try {
             wb = WorkbookFactory.create(new File(path));
             return handlerExcel2Objs(wb, clz, readLine, tailLine);
-        } catch (InvalidFormatException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.error("ExcelUtil.readExcel2ObjsByPath.ex", e);
         }
         return null;
     }
@@ -346,7 +370,7 @@ public class ExcelUtil {
         try {
             Row row = sheet.getRow(readLine);
             objs = new ArrayList<Object>();
-            Map<Integer, String> maps = getHeaderMap(row, clz);
+            Map<Integer, String> maps = getHeaderMap(sheet, row, clz);
             if (maps == null || maps.size() <= 0) throw new RuntimeException("要读取的Excel的格式不正确，检查是否设定了合适的行");
             for (int i = readLine + 1; i <= sheet.getLastRowNum() - tailLine; i++) {
                 row = sheet.getRow(i);
@@ -359,12 +383,8 @@ public class ExcelUtil {
                 }
                 objs.add(obj);
             }
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            LOGGER.error("ExcelUtil.handlerExcel2Objs.ex", e);
         }
         return objs;
     }
@@ -384,15 +404,48 @@ public class ExcelUtil {
         return headers;
     }
 
-    private Map<Integer, String> getHeaderMap(Row titleRow, Class clz) {
+    private Map<Integer, String> getHeaderMap(Sheet sheet, Row titleRow, Class clz) {
         List<ExcelHeader> headers = getHeaderList(clz);
         Map<Integer, String> maps = new HashMap<Integer, String>();
-        for (Cell c : titleRow) {
-            String title = c.getStringCellValue();
-            for (ExcelHeader eh : headers) {
-                if (eh.getTitle().equals(title.trim())) {
-                    maps.put(c.getColumnIndex(), eh.getMethodName().replace("get", "set"));
-                    break;
+        List<CellRangeAddress> mergedRegions = sheet.getMergedRegions();
+        // 表头有合并,默认从第一行,第一列开始解析表头
+        if (CollectionUtils.isNotEmpty(mergedRegions)) {
+            mergedRegions.stream().forEach(x -> {
+                int firstRow = x.getFirstRow();
+                int firstColumn = x.getFirstColumn();
+                int lastColumn = x.getLastColumn();
+                // 表头横跨多个列,不计为属性字段
+                if (firstColumn != lastColumn) {
+                    for (int i = firstColumn; i <= lastColumn; i++) {
+                        // row = firstRow + 1,虽然合并了,但是还是放在第一个row上,+1排除掉上面合并的title
+                        String title = sheet.getRow(firstRow + 1).getCell(i).getStringCellValue();
+                        for (ExcelHeader eh : headers) {
+                            if (eh.getTitle().equals(title.trim())) {
+                                maps.put(i, eh.getMethodName().replace("get", "set"));
+                                break;
+                            }
+                        }
+
+                    }
+                } else {
+                    String title = sheet.getRow(firstRow).getCell(firstColumn).getStringCellValue();
+                    for (ExcelHeader eh : headers) {
+                        if (eh.getTitle().equals(title.trim())) {
+                            maps.put(firstColumn, eh.getMethodName().replace("get", "set"));
+                            break;
+                        }
+                    }
+                }
+            });
+            // 无合并
+        } else {
+            for (Cell c : titleRow) {
+                String title = c.getStringCellValue();
+                for (ExcelHeader eh : headers) {
+                    if (eh.getTitle().equals(title.trim())) {
+                        maps.put(c.getColumnIndex(), eh.getMethodName().replace("get", "set"));
+                        break;
+                    }
                 }
             }
         }

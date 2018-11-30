@@ -200,7 +200,6 @@ public class ExcelTemplate {
         if (!findSer) {
             initSer();
         }
-        System.out.println(curColIndex + "," + curRowIndex);
     }
 
     /**
